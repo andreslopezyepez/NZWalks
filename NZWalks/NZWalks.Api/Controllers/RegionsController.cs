@@ -1,5 +1,5 @@
 ﻿using AutoMapper;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NZWalks.Api.Repositories;
 
@@ -7,6 +7,7 @@ namespace NZWalks.Api.Controllers
 {
     [Route("[controller]")]
     [ApiController]
+    [Authorize(Roles = "writer")]
     public class RegionsController : ControllerBase
     {
         private readonly IRegionRepository regionRepository;
@@ -55,9 +56,9 @@ namespace NZWalks.Api.Controllers
         [HttpDelete]
         [Route("{id:guid}")]
         public async Task<IActionResult> DeleteRegionAsync(Guid id)
-        {                                 
+        {
             var region = await regionRepository.DeleteAsync(id);
-            if (region is null) return NotFound();            
+            if (region is null) return NotFound();
             var responseRegion = mapper.Map<Models.Dto.Region>(region);
             return Ok(responseRegion);
         }
@@ -66,6 +67,8 @@ namespace NZWalks.Api.Controllers
         [Route("{id:guid}")]
         public async Task<IActionResult> UpdateRegionAsync([FromRoute] Guid id, [FromBody] Models.Dto.UpdateRegionRequest regionRequest)
         {
+            if (!ValidateUpdateRegionAsync(regionRequest)) return BadRequest(ModelState);
+
             //1) Request to domain model
             var region = mapper.Map<Models.Domain.Region>(regionRequest);
 
@@ -77,7 +80,27 @@ namespace NZWalks.Api.Controllers
             var responseRegion = mapper.Map<Models.Dto.Region>(region);
 
             //4) response
-            return Ok(responseRegion);            
+            return Ok(responseRegion);
         }
+
+        #region Private Methods
+        private bool ValidateUpdateRegionAsync(Models.Dto.UpdateRegionRequest request)
+        {
+            if (request == null)
+            {
+                ModelState.AddModelError(nameof(request), "Region data cannot be null");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                ModelState.AddModelError(nameof(request.Name), $"{nameof(request.Name)} cannot be null or empty or white space");
+            }
+
+            if (ModelState.ErrorCount > 0) return false;
+
+            return true;
+        }
+        #endregion
     }
 }
